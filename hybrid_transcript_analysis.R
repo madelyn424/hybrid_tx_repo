@@ -678,6 +678,7 @@ agg_tbl_megasheet <- df_megasheet_all_observations_summarized3 %>%
   mutate(Count_Total_Gene_Type_per_date_per_replicate = sum(Sum_total_tx_each_replicate))
 df_megasheet_all_observations_summarized_genetype_count <- agg_tbl_megasheet %>% as.data.frame()
 
+library(data.table)
 setDT(df_megasheet_all_observations_summarized_genetype_count)
 df_megasheet_all_observations_summarized_genetype_count[, Mean_total_tx_per_Gene_type :=mean(Count_Total_Gene_Type_per_date_per_replicate), by = c('PIC_ID',"Gene_Type", "Pulldown_date")]
 
@@ -739,34 +740,60 @@ agg_tbl_megasheet <- df_megasheet_all_observations_summarized3 %>%
   mutate(Count_Total_Pulldown_dates_With_This_Gene_tx = n_distinct(Pulldown_date))
 df_megasheet_all_observations_summarized_3_genetype_date <- agg_tbl_megasheet %>% as.data.frame()
 
-df_megasheet_all_observations_summarized_3_genetype_date$PIC_ID <- as.factor(df_megasheet_all_observations_summarized_3_genetype_date$PIC_ID)
-df_megasheet_all_observations_summarized_3_genetype_date$Gene_Tx <- as.factor(df_megasheet_all_observations_summarized_3_genetype_date$Gene_Tx)
-df_megasheet_all_observations_summarized_3_genetype_date$Sum_total_tx_each_replicate <- as.numeric(df_megasheet_all_observations_summarized_3_genetype_date$Sum_total_tx_each_replicate)
+#df_megasheet_all_observations_summarized_3_genetype_date$PIC_ID <- as.factor(df_megasheet_all_observations_summarized_3_genetype_date$PIC_ID)
+#df_megasheet_all_observations_summarized_3_genetype_date$Gene_Tx <- as.factor(df_megasheet_all_observations_summarized_3_genetype_date$Gene_Tx)
+#df_megasheet_all_observations_summarized_3_genetype_date$Sum_total_tx_each_replicate <- as.numeric(df_megasheet_all_observations_summarized_3_genetype_date$Sum_total_tx_each_replicate)
 
 library(lubridate)
 
-df_megasheet_all_observations_summarized_3_genetype_date$Pulldown_date <- as.Date(df_megasheet_all_observations_summarized_3_genetype_date$Pulldown_date, "%m/%d/%Y")
+#df_megasheet_all_observations_summarized_3_genetype_date$Pulldown_date <- as.Date(df_megasheet_all_observations_summarized_3_genetype_date$Pulldown_date, "%m/%d/%Y")
 
-#Next get percentages by dates
-df_megasheet_all_observations_summarized_3_genetype <- 
-  df_megasheet_all_observations_summarized_3_genetype %>%
-  group_by(PIC_ID) %>%
-  mutate(Percentage = round(Count_Total_Gene_Type / sum(Count_Total_Gene_Type)*100, 1))
+#Add column for number of experiments (replicates) performed on a date for each PID
+agg_tbl_megasheet <- df_megasheet_all_observations_summarized_3_genetype_date %>%
+  select(PIC_ID, cDNA_primers, Ug_RNA_input_Capture, Pulldown_date, Num_of_replicates)
+df_megasheet_all_observations_summarized_4_genetype_date <- agg_tbl_megasheet %>% as.data.frame()
+  
+df_megasheet_all_observations_summarized_4_genetype_date <- df_megasheet_all_observations_summarized_4_genetype_date %>% distinct()
+
+df_megasheet_all_observations_summarized_4_genetype_date$Num_of_replicates<- as.numeric(df_megasheet_all_observations_summarized_4_genetype_date$Num_of_replicates)
+
+agg_tbl_megasheet <- df_megasheet_all_observations_summarized_4_genetype_date %>%  
+  group_by(PIC_ID, Pulldown_date) %>%
+  summarise(Number_of_experiments_per_date = sum(Num_of_replicates), .groups =("keep")) 
+  df_megasheet_all_observations_summarized_4_genetype_date <- agg_tbl_megasheet %>% as.data.frame()
+
+df_megasheet_all_observations_summarized_3_genetype_date$Number_of_experiments_per_date <- df_megasheet_all_observations_summarized_4_genetype_date[match(paste(df_megasheet_all_observations_summarized_3_genetype_date$PIC_ID,df_megasheet_all_observations_summarized_3_genetype_date$Pulldown_date),paste(df_megasheet_all_observations_summarized_4_genetype_date$PIC_ID,df_megasheet_all_observations_summarized_4_genetype_date$Pulldown_date)),"Number_of_experiments_per_date"]
+
 
 #Next get count means and SE by date per replicate
 setDT(df_megasheet_all_observations_summarized_3_genetype_date)
-df_megasheet_all_observations_summarized_3_genetype_date[, Mean_total_tx_per_Gene_Tx :=mean("Sum_total_tx_each_replicate"), by = c('PIC_ID',"Gene_Tx", "Pulldown_date")]
+df_megasheet_all_observations_summarized_3_genetype_date[, Mean_Gene_Tx_per_Date :=mean(Sum_total_tx_each_replicate), by = c('PIC_ID', "Pulldown_date")]
 
 setDT(df_megasheet_all_observations_summarized_3_genetype_date)
-df_megasheet_all_observations_summarized_3_genetype_date[, SE_total_tx_per_Gene_Tx :=std.error("Sum_total_tx_each_replicate"), by = c('PIC_ID',"Gene_Tx", "Pulldown_date")]
+df_megasheet_all_observations_summarized_3_genetype_date[, SE_Gene_Tx_per_Date :=std.error(Sum_total_tx_each_replicate), by = c('PIC_ID', "Pulldown_date")]
 
+
+#Next get percentages by dates
+df_megasheet_all_observations_summarized_3_genetype_date$Num_of_replicates<- as.numeric(df_megasheet_all_observations_summarized_3_genetype_date$Num_of_replicates)
+
+agg_tbl_megasheet <- 
+  df_megasheet_all_observations_summarized_3_genetype_date %>%
+  group_by(PIC_ID, Pulldown_date, cDNA_primers, Ug_RNA_input_Capture) %>%
+  mutate(Percentage_Mean_Gene_Tx_per_Date = round(Mean_Gene_Tx_per_Date/sum(Mean_Gene_Tx_per_Date) *100, 1))
+df_megasheet_all_observations_summarized_3_genetype_date <- agg_tbl_megasheet %>% as.data.frame()
+
+agg_tbl_megasheet <- 
+  df_megasheet_all_observations_summarized_3_genetype_date %>%
+  group_by(PIC_ID, Pulldown_date, cDNA_primers, Ug_RNA_input_Capture) %>%
+  mutate(Percentage_SE_Gene_Tx_per_Date = round(SE_Gene_Tx_per_Date/sum(Mean_Gene_Tx_per_Date) *100, 1))
+df_megasheet_all_observations_summarized_3_genetype_date <- agg_tbl_megasheet %>% as.data.frame()
 
 
 
 #Then filter by those showing up on more than 2 dates
 agg_tbl_megasheet <- df_megasheet_all_observations_summarized_3_genetype_date %>%
 filter(Count_Total_Pulldown_dates_With_This_Gene_tx>2)
-df_megasheet_all_observations_summarized_4_genetype_date <- agg_tbl_megasheet %>% as.data.frame()
+df_megasheet_all_observations_summarized_5_genetype_date <- agg_tbl_megasheet %>% as.data.frame()
 
 
 #I want to group all the high frequency transcripts together.
@@ -776,7 +803,7 @@ df_megasheet_all_observations_summarized_4_genetype_date <- agg_tbl_megasheet %>
 library(dplyr)
 
 #Graph
-ggplot(df_megasheet_all_observations_summarized_3_genetype, aes(x=Gene_Tx3, y=Percentage, fill=Pulldown_date)) +
+ggplot(df_megasheet_all_observations_summarized_5_genetype_date, aes(x=Gene_Tx, y=Percentage_Mean_Gene_Tx_per_Date, fill=Pulldown_date)) +
   geom_bar (stat="identity", position=position_dodge2(preserve="single"), width = NULL) +
   ylab("% Total transcript distribution") +
   theme(axis.text.x = element_text(angle=90, size=8, hjust = 1, vjust=0.5), panel.grid.major = element_line(size=0.5, linetype='solid', color="white"),panel.grid.minor = element_line(size=0.25, linetype='solid', color="white"), panel.spacing = unit(0, "lines"),panel.border = element_rect(color = "black", fill = NA, size = 0.25),strip.background = element_rect(color = "black", size = 0.25)) +
@@ -789,8 +816,9 @@ ggplot(df_megasheet_all_observations_summarized_3_genetype, aes(x=Gene_Tx3, y=Pe
   theme(legend.title = element_text(size = 10), 
         legend.text  = element_text(size = 10),
         legend.key.size = unit(6, "mm"))+
-  facet_grid(~ PIC_ID, scales = "free_x", space="free_x")+
-  geom_text(aes(label = Count_Total_Gene_Type), vjust = -.5, colour = "black", angle = 0, size = 2,  position = position_dodge(width = 1)) 
+  facet_grid(~ PIC_ID, scales = "free_x", space="free_x")
+  
+#geom_text(aes(label = Count_Total_Gene_Type), vjust = -.5, colour = "black", angle = 0, size = 2,  position = position_dodge(width = 1)) 
 
 library(ggplot2)
 
@@ -855,7 +883,7 @@ ggplot(df_megasheet_all_observations_summarized_genetype_count_unique2, aes(fill
   geom_text(aes(label = Count_Total_Gene_Type))
 
 
-# Reproducibility of assay in all PID ---------------------------------------
+# Reproducibility of assay in all PID (old version) ---------------------------------------
 
 #Only have random hexamers in this graph
 df_megasheet_all_observations_summarized3
