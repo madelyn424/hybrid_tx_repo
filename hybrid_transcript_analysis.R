@@ -451,6 +451,8 @@ ggplot(df_megasheet_all_observations_summarized_cDNA4, aes(x=as.character(cDNA_p
 
 # #Adding rows with zero value for replicates with no observation ---------
 
+library(dplyr)
+
 df_megasheet <- read.csv("MegaTxSheet11Jan2024.csv")
 
 agg_tbl_megasheet <- df_megasheet %>%
@@ -594,11 +596,8 @@ df_megasheet_all_observations_summarized3 <- agg_tbl_megasheet %>% as.data.frame
 
 df_megasheet_all_observations_summarized3
 agg_tbl_megasheet <-df_megasheet_all_observations_summarized3 %>%
-mutate(Sum_total_Genetype_each_replicate_per_Ug = sum(Sum_Gene_type)/sum(Ug_RNA_input_Capture))
+mutate(Sum_total_Gene_type_each_replicate_per_Ug = sum(Sum_Gene_type)/sum(Ug_RNA_input_Capture))
 df_megasheet_all_observations_summarized3 <- agg_tbl_megasheet %>% as.data.frame()
-
-
-#write.csv(df6_1373_3, "df6_1373_3.csv")
 
 #Select only columns I need
 library(dplyr)
@@ -606,17 +605,17 @@ library(tidyverse)
 library(plotrix)
 
 agg_tbl_megasheet <-df_megasheet_all_observations_summarized3  %>%
-  select(c(PIC_ID, Gene_Tx, Ug_RNA_input_Capture, Sum_total_tx_each_Gene_Type_per_Ug, Gene_Type, Replicate)) 
+  select(c(PIC_ID, Gene_Tx, Ug_RNA_input_Capture, Sum_total_Gene_type_each_replicate_per_Ug, Gene_Type, Replicate)) 
 df_megasheet_all_observations_summarized4 <- agg_tbl_megasheet %>% as.data.frame()
 
 df_megasheet_all_observations_summarized5 <- df_megasheet_all_observations_summarized4 %>% distinct()
 
 library(data.table)
 setDT(df_megasheet_all_observations_summarized5)
-df_megasheet_all_observations_summarized5 [, Mean_total_each_tx_type_per_ug :=mean(Sum_total_tx_each_Gene_Type_per_Ug), by = c('PIC_ID', 'Gene_Type')]
+df_megasheet_all_observations_summarized5 [, Mean_total_each_tx_type_per_ug :=mean(Sum_total_Gene_type_each_replicate_per_Ug), by = c('PIC_ID', 'Gene_Type')]
 
 setDT(df_megasheet_all_observations_summarized5)
-df_megasheet_all_observations_summarized5[, SE_total_tx_each_tx_type_per_ug :=std.error(Sum_total_tx_each_Gene_Type_per_Ug), by = c('PIC_ID', 'Gene_Type')]
+df_megasheet_all_observations_summarized5[, SE_total_tx_each_tx_type_per_ug :=std.error(Sum_total_Gene_type_each_replicate_per_Ug), by = c('PIC_ID', 'Gene_Type')]
 
 agg_tbl_megasheet <-df_megasheet_all_observations_summarized5 %>%
   select(c(PIC_ID, Gene_Type, Mean_total_each_tx_type_per_ug, SE_total_tx_each_tx_type_per_ug))
@@ -733,23 +732,35 @@ ggplot(df_megasheet_all_observations_summarized_genetype_count_unique2, aes(fill
 
 # Percent distribution of high frequency transcripts in EACH PID from a megasheet BY DATE)--------
 
+library(data.table)
+
 agg_tbl_megasheet <- df_megasheet_all_observations_summarized3 %>%
   group_by(PIC_ID, Gene_Tx) %>%
   mutate(Count_Total_Pulldown_dates_With_This_Gene_tx = n_distinct(Pulldown_date))
 df_megasheet_all_observations_summarized_3_genetype_date <- agg_tbl_megasheet %>% as.data.frame()
 
-#Next get count means and SE by date 
-setDT(df_megasheet_all_observations_summarized_3_genetype_date)
-df_megasheet_all_observations_summarized_3_genetype_date[, Mean_total_tx_per_Gene_Tx :=mean("Sum_total_tx_each_replicate"), by = c('PIC_ID',"Gene_Tx", "Pulldown_date")]
+df_megasheet_all_observations_summarized_3_genetype_date$PIC_ID <- as.factor(df_megasheet_all_observations_summarized_3_genetype_date$PIC_ID)
+df_megasheet_all_observations_summarized_3_genetype_date$Gene_Tx <- as.factor(df_megasheet_all_observations_summarized_3_genetype_date$Gene_Tx)
+df_megasheet_all_observations_summarized_3_genetype_date$Sum_total_tx_each_replicate <- as.numeric(df_megasheet_all_observations_summarized_3_genetype_date$Sum_total_tx_each_replicate)
 
-setDT(df_megasheet_all_observations_summarized_3_genetype_date)
-df_megasheet_all_observations_summarized_3_genetype_date[, SE_total_tx_per_Gene_Tx :=std.error("Sum_total_tx_each_replicate"), by = c('PIC_ID',"Gene_Tx", "Pulldown_date")]
+library(lubridate)
+
+df_megasheet_all_observations_summarized_3_genetype_date$Pulldown_date <- as.Date(df_megasheet_all_observations_summarized_3_genetype_date$Pulldown_date, "%m/%d/%Y")
 
 #Next get percentages by dates
 df_megasheet_all_observations_summarized_3_genetype <- 
   df_megasheet_all_observations_summarized_3_genetype %>%
   group_by(PIC_ID) %>%
   mutate(Percentage = round(Count_Total_Gene_Type / sum(Count_Total_Gene_Type)*100, 1))
+
+#Next get count means and SE by date per replicate
+setDT(df_megasheet_all_observations_summarized_3_genetype_date)
+df_megasheet_all_observations_summarized_3_genetype_date[, Mean_total_tx_per_Gene_Tx :=mean("Sum_total_tx_each_replicate"), by = c('PIC_ID',"Gene_Tx", "Pulldown_date")]
+
+setDT(df_megasheet_all_observations_summarized_3_genetype_date)
+df_megasheet_all_observations_summarized_3_genetype_date[, SE_total_tx_per_Gene_Tx :=std.error("Sum_total_tx_each_replicate"), by = c('PIC_ID',"Gene_Tx", "Pulldown_date")]
+
+
 
 
 #Then filter by those showing up on more than 2 dates
@@ -978,9 +989,6 @@ geom_errorbar(aes(ymin=Mean_total_tx_each_replicate_per_ug-SE_total_tx_each_repl
         legend.key.size = unit(5, "mm"))
 
 
-# Git repository set-up
-
-
 # as.character/as.factor references ---------------------------------------
 df_megasheet_all_observations_summarized_3_genetype_date$Replicate <- as.character(df_megasheet_all_observations_summarized_3_genetype_date$Replicate)
 
@@ -992,9 +1000,7 @@ df_megasheet_all_observations_summarized_3_genetype_date$Gene_Tx <- as.factor(df
 
 df_megasheet_all_observations_summarized_3_genetype_date$Pulldown_date <- as.numeric(factor((df_megasheet_all_observations_summarized_3_genetype_date$Pulldown_date)))
 
-library(lubridate)
 
-df_megasheet_all_observations_summarized_3_genetype_date$Pulldown_date <- as.Date(df_megasheet_all_observations_summarized_3_genetype_date$Pulldown_date, "%m/%d/%Y")
 
 
 # #I can probably delete the following ------------------------------------
