@@ -647,7 +647,7 @@ facet_wrap('PIC_ID')
   
 
 
-# Percent distribution of transcripts in EACH PID from a megasheet --------
+# Percent distribution of transcript TYPE in EACH PID from a megasheet --------
 
 #df_megasheet <- read.csv("MegaTxSheet02Oct2023.csv")
 library(dplyr)
@@ -731,7 +731,7 @@ ggplot(df_megasheet_all_observations_summarized_genetype_count_unique2, aes(fill
   ylab("PIC_ID") +
   geom_text(aes(label = Count_Total_Gene_Type))
 
-# Percent distribution of high frequency transcripts in EACH PID from a megasheet BY DATE)--------
+# Percent distribution of high frequency transcripts in EACH PID from a megasheet BY DATE (Reproducibility))--------
 
 library(data.table)
 
@@ -744,41 +744,49 @@ df_megasheet_all_observations_summarized_3_genetype_date$Gene_Tx2 <- "Less-Frequ
 rowsIwant <- df_megasheet_all_observations_summarized_3_genetype_date$Count_Total_Pulldown_dates_With_This_Gene_tx>2
 df_megasheet_all_observations_summarized_3_genetype_date$Gene_Tx2[rowsIwant] <- as.character(df_megasheet_all_observations_summarized_3_genetype_date$Gene_Tx[rowsIwant]) 
 
+#Redo counts with Gene_Tx2
 agg_tbl_megasheet <- df_megasheet_all_observations_summarized_3_genetype_date %>%
-  group_by(PIC_ID, Pulldown_date, cDNA_primers, Ug_RNA_input_Capture, Gene_Tx2) %>%
-  mutate(Sum_total_tx_each_replicate_LF = sum(Sum_total_tx_each_replicate))
-df_megasheet_all_observations_summarized_3_genetype_date <- agg_tbl_megasheet %>% as.data.frame()
-
-agg_tbl_megasheet <- df_megasheet_all_observations_summarized_3_genetype_date %>%
-  filter(!(Gene_Type == "HIV-only"))
+select(PIC_ID, Pulldown_date, cDNA_primers, Ug_RNA_input_Capture, Replicate, Sum_total_tx_each_replicate, Gene_Tx2)
 df_megasheet_all_observations_summarized_4_genetype_date <- agg_tbl_megasheet %>% as.data.frame()
+
+agg_tbl_megasheet <- df_megasheet_all_observations_summarized_4_genetype_date %>%  
+group_by(PIC_ID, Pulldown_date, cDNA_primers, Ug_RNA_input_Capture, Replicate, Gene_Tx2) %>%
+summarise(Sum_total_tx_each_replicate_LF = sum(Sum_total_tx_each_replicate), .groups =("keep")) 
+df_megasheet_all_observations_summarized_5_genetype_date <- agg_tbl_megasheet %>% as.data.frame()
+
+df_megasheet_all_observations_summarized_4_genetype_date$Sum_total_tx_each_replicate_LF <- df_megasheet_all_observations_summarized_5_genetype_date[match(paste(df_megasheet_all_observations_summarized_4_genetype_date$PIC_ID,df_megasheet_all_observations_summarized_4_genetype_date$Pulldown_date, df_megasheet_all_observations_summarized_4_genetype_date$cDNA_primers, df_megasheet_all_observations_summarized_4_genetype_date$Ug_RNA_input_Capture, df_megasheet_all_observations_summarized_4_genetype_date$Replicate, df_megasheet_all_observations_summarized_4_genetype_date$Gene_Tx2),paste(df_megasheet_all_observations_summarized_5_genetype_date$PIC_ID,df_megasheet_all_observations_summarized_5_genetype_date$Pulldown_date, df_megasheet_all_observations_summarized_5_genetype_date$cDNA_primers, df_megasheet_all_observations_summarized_5_genetype_date$Ug_RNA_input_Capture, df_megasheet_all_observations_summarized_5_genetype_date$Replicate, df_megasheet_all_observations_summarized_5_genetype_date$Gene_Tx2)),"Sum_total_tx_each_replicate_LF"]
+
+
+#agg_tbl_megasheet <- df_megasheet_all_observations_summarized_3_genetype_date %>%
+ # filter(!(Gene_Type == "HIV-only"))
+#df_megasheet_all_observations_summarized_4_genetype_date <- agg_tbl_megasheet %>% as.data.frame()
 
 #Next get count means and SE by date per replicate
 setDT(df_megasheet_all_observations_summarized_4_genetype_date)
-df_megasheet_all_observations_summarized_4_genetype_date[, Mean_Gene_Tx_per_Date :=mean(Sum_total_tx_each_replicate_LF), by = c('PIC_ID', "Pulldown_date")]
+df_megasheet_all_observations_summarized_4_genetype_date[, Mean_Gene_Tx_per_Date :=mean(Sum_total_tx_each_replicate_LF), by = c('PIC_ID', "Gene_Tx2", "Pulldown_date")]
 
 setDT(df_megasheet_all_observations_summarized_4_genetype_date)
-df_megasheet_all_observations_summarized_4_genetype_date[, SE_Gene_Tx_per_Date :=std.error(Sum_total_tx_each_replicate_LF), by = c('PIC_ID', "Pulldown_date")]
+df_megasheet_all_observations_summarized_4_genetype_date[, SE_Gene_Tx_per_Date :=std.error(Sum_total_tx_each_replicate_LF), by = c('PIC_ID',"Gene_Tx2", "Pulldown_date")]
+
+df_megasheet_all_observations_summarized_6_genetype_date<- df_megasheet_all_observations_summarized_4_genetype_date %>% select("PIC_ID", "Gene_Tx2","Pulldown_date", "Mean_Gene_Tx_per_Date", "SE_Gene_Tx_per_Date")
+df_megasheet_all_observations_summarized_6_genetype_date<- df_megasheet_all_observations_summarized_6_genetype_date %>% distinct()
 
 
 #Next get percentages by dates
 #df_megasheet_all_observations_summarized_4_genetype_date$Num_of_replicates<- as.numeric(df_megasheet_all_observations_summarized_4_genetype_date$Num_of_replicates)
 
 agg_tbl_megasheet <- 
-  df_megasheet_all_observations_summarized_4_genetype_date %>%
-  group_by(PIC_ID, Pulldown_date) %>%
+  df_megasheet_all_observations_summarized_6_genetype_date %>%
+  group_by(PIC_ID, Gene_Tx2) %>%
   mutate(Percentage_Mean_Gene_Tx_per_Date = round(Mean_Gene_Tx_per_Date/sum(Mean_Gene_Tx_per_Date) *100, 1))
-df_megasheet_all_observations_summarized_4_genetype_date <- agg_tbl_megasheet %>% as.data.frame()
+df_megasheet_all_observations_summarized_6_genetype_date <- agg_tbl_megasheet %>% as.data.frame()
 
 agg_tbl_megasheet <- 
-  df_megasheet_all_observations_summarized_4_genetype_date %>%
-  group_by(PIC_ID, Pulldown_date) %>%
+  df_megasheet_all_observations_summarized_6_genetype_date %>%
+  group_by(PIC_ID, Gene_Tx2) %>%
   mutate(Percentage_SE_Gene_Tx_per_Date = round(SE_Gene_Tx_per_Date/sum(Mean_Gene_Tx_per_Date) *100, 1))
-df_megasheet_all_observations_summarized_4_genetype_date <- agg_tbl_megasheet %>% as.data.frame()
+df_megasheet_all_observations_summarized_6_genetype_date <- agg_tbl_megasheet %>% as.data.frame()
 
-#Get select only the columns needed for chart and get rid of duplicates
-df_megasheet_all_observations_summarized_5_genetype_date <- df_megasheet_all_observations_summarized_4_genetype_date %>% select("PIC_ID", "Gene_Tx2","Pulldown_date", "Percentage_Mean_Gene_Tx_per_Date", "Percentage_SE_Gene_Tx_per_Date")
-df_megasheet_all_observations_summarized_6_genetype_date<- df_megasheet_all_observations_summarized_5_genetype_date %>% distinct()
 
 #The only thing I have left to do is to figure out why the fuck the numbers aren't adding up to 100% on all dates. Once I figure out the math issue, I think the code should be ok.
 
@@ -791,14 +799,14 @@ ggplot(df_megasheet_all_observations_summarized_6_genetype_date, aes(x=Gene_Tx2,
   theme(axis.text.x = element_text(angle=90, size=8, hjust = 1, vjust=0.5), panel.grid.major = element_line(size=0.5, linetype='solid', color="white"),panel.grid.minor = element_line(size=0.25, linetype='solid', color="white"), panel.spacing = unit(0, "lines"),panel.border = element_rect(color = "black", fill = NA, size = 0.25),strip.background = element_rect(color = "black", size = 0.25)) +
   scale_fill_discrete(name="Experiment Date")+
   scale_x_discrete(labels = function(x) str_wrap(x, width=30), name="Gene_location") +
-  scale_y_continuous(limits = c(0,40), expand = c(0, 0))+
+  scale_y_continuous(limits = c(0,75), expand = c(0, 0))+
   theme(panel.background = element_rect(fill = "white")) +
   guides(shape = guide_legend(override.aes = list(size = 10)), color = guide_legend(override.aes = list(size = 10))) +
   guides(shape = guide_legend(override.aes = list(size = 10)), color = guide_legend(override.aes = list(size = 10))) +
   theme(legend.title = element_text(size = 10), 
         legend.text  = element_text(size = 10),
         legend.key.size = unit(6, "mm"))+
-  geom_errorbar(aes(ymin=Percentage_Mean_Gene_Tx_per_Date-Percentage_SE_Gene_Tx_per_Date, ymax=Percentage_Mean_Gene_Tx_per_Date+Percentage_SE_Gene_Tx_per_Date), position=position_dodge2(preserve="single")) +
+  #geom_errorbar(aes(ymin=Percentage_Mean_Gene_Tx_per_Date-Percentage_SE_Gene_Tx_per_Date, ymax=Percentage_Mean_Gene_Tx_per_Date+Percentage_SE_Gene_Tx_per_Date), position=position_dodge2(preserve="single")) +
   facet_grid(~ PIC_ID, scales = "free_x", space="free_x")
   
 #geom_text(aes(label = Count_Total_Gene_Type), vjust = -.5, colour = "black", angle = 0, size = 2,  position = position_dodge(width = 1)) 
