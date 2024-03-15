@@ -449,6 +449,26 @@ ggplot(df_megasheet_all_observations_summarized_cDNA4, aes(x=as.character(cDNA_p
         legend.text  = element_text(size = 10),
         legend.key.size = unit(5, "mm"))
 
+# oligo(dT)s vs R6 cDNA_ONLY ----------------------------------------------
+df_qPCR <- read.csv("Oligo_dT_vs_R6_qPCR_03142024.csv")
+
+agg_tbl <- df_qPCR %>% 
+  rowwise() %>% 
+  mutate(Mean_HIV_copies_per_Ug = mean(c_across(c("Copies_per_Ug_1", "Copies_per_Ug_2", "Copies_per_Ug_3"))))
+df_qPCR <- agg_tbl %>% as.data.frame()
+
+agg_tbl <- df_qPCR %>% 
+  rowwise() %>% 
+  mutate(SE_HIV_copies_per_Ug= sd(c_across(c("Copies_per_Ug_1", "Copies_per_Ug_2", "Copies_per_Ug_3"))/sqrt(length(c("Copies_per_Ug_1", "Copies_per_Ug_2", "Copies_per_Ug_3")))))
+df_qPCR <- agg_tbl %>% as.data.frame()
+
+ggplot(data = df_qPCR, aes(x = as.character(PIC_ID), y = Mean_HIV_copies_per_Ug, fill = as.factor(Primer))) +
+  geom_bar(stat = "identity", color = "black", position = position_dodge()) +
+  labs(x = "PIC_ID", y = "Mean HIV copies per Ug", fill = "cDNA_Synthesis_Primer") +
+  theme_minimal() +
+  theme(text = element_text(size = 15))+
+  geom_errorbar(aes(ymin=Mean_HIV_copies_per_Ug-SE_HIV_copies_per_Ug, ymax=Mean_HIV_copies_per_Ug+SE_HIV_copies_per_Ug), position=position_dodge2(preserve="single"))
+
 # #Adding rows with zero value for replicates with no observation ---------
 
 library(dplyr)
@@ -740,7 +760,7 @@ agg_tbl_megasheet <- df_megasheet_all_observations_summarized3 %>%
   mutate(Count_Total_Pulldown_dates_With_This_Gene_tx = n_distinct(Pulldown_date))
 df_megasheet_all_observations_summarized_3_genetype_date <- agg_tbl_megasheet %>% as.data.frame()
 
-df_megasheet_all_observations_summarized_3_genetype_date$Gene_Tx2 <- "Less-Frequent_Hybrid_Transcript"
+df_megasheet_all_observations_summarized_3_genetype_date$Gene_Tx2 <- "HIV-Human Hybrid Transcripts Observed < 3 dates"
 rowsIwant <- df_megasheet_all_observations_summarized_3_genetype_date$Count_Total_Pulldown_dates_With_This_Gene_tx>2
 df_megasheet_all_observations_summarized_3_genetype_date$Gene_Tx2[rowsIwant] <- as.character(df_megasheet_all_observations_summarized_3_genetype_date$Gene_Tx[rowsIwant]) 
 
@@ -788,9 +808,6 @@ agg_tbl_megasheet <-
   mutate(Percentage_SE_Gene_Tx_per_Date = round(SE_Gene_Tx_per_Date/sum(Mean_Gene_Tx_per_Date) *100, 1))
 df_megasheet_all_observations_summarized_7_genetype_date <- agg_tbl_megasheet %>% as.data.frame()
 
-
-#The only thing I have left to do is to figure out why the fuck the numbers aren't adding up to 100% on all dates. Once I figure out the math issue, I think the code should be ok.
-
 library(dplyr)
 
 #Graph
@@ -800,14 +817,16 @@ ggplot(df_megasheet_all_observations_summarized_7_genetype_date, aes(x=Gene_Tx2,
   theme(axis.text.x = element_text(angle=90, size=8, hjust = 1, vjust=0.5), panel.grid.major = element_line(size=0.5, linetype='solid', color="white"),panel.grid.minor = element_line(size=0.25, linetype='solid', color="white"), panel.spacing = unit(0, "lines"),panel.border = element_rect(color = "black", fill = NA, size = 0.25),strip.background = element_rect(color = "black", size = 0.25)) +
   scale_fill_discrete(name="Experiment Date")+
   scale_x_discrete(labels = function(x) str_wrap(x, width=30), name="Gene_location") +
-  scale_y_continuous(limits = c(0,100), expand = c(0, 0))+
+  scale_y_continuous(trans = 'pseudo_log',
+                     labels = scales::number_format(accuracy=0.01))+
+  #scale_y_continuous(limits = c(0,100), expand = c(0, 0))+
   theme(panel.background = element_rect(fill = "white")) +
   guides(shape = guide_legend(override.aes = list(size = 10)), color = guide_legend(override.aes = list(size = 10))) +
   guides(shape = guide_legend(override.aes = list(size = 10)), color = guide_legend(override.aes = list(size = 10))) +
   theme(legend.title = element_text(size = 10), 
         legend.text  = element_text(size = 10),
         legend.key.size = unit(6, "mm"))+
-geom_errorbar(aes(ymin=Percentage_Mean_Gene_Tx_per_Date-Percentage_SE_Gene_Tx_per_Date, ymax=Percentage_Mean_Gene_Tx_per_Date+Percentage_SE_Gene_Tx_per_Date), position=position_dodge2(preserve="single")) +
+geom_errorbar(aes(ymin=Percentage_Mean_Gene_Tx_per_Date-Percentage_SE_Gene_Tx_per_Date, ymax=Percentage_Mean_Gene_Tx_per_Date+Percentage_SE_Gene_Tx_per_Date), position=position_dodge2(preserve="single"), size = 0.3, col = "grey15") +
   facet_grid(~ PIC_ID, scales = "free_x", space="free_x")
   
 #geom_text(aes(label = Count_Total_Gene_Type), vjust = -.5, colour = "black", angle = 0, size = 2,  position = position_dodge(width = 1)) 
@@ -899,7 +918,7 @@ library(tidyverse)
 
 #df_megasheet_all_observations_R6_only2
 #agg_tbl_megasheet <-df_megasheet_all_observations_R6_only2 %>%
-  #select(c(Gene_Tx, Pulldown_date, Sum_total_tx_each_replicate_per_Ug, Gene_Tx, Replicate)) 
+#select(c(Gene_Tx, Pulldown_date, Sum_total_tx_each_replicate_per_Ug, Gene_Tx, Replicate)) 
 #df_megasheet_all_observations_R6_only3 <- agg_tbl_megasheet %>% as.data.frame()
 
 #df_megasheet_all_observations_R6_only3 <- df_megasheet_all_observations_R6_only3 %>% distinct()
@@ -994,7 +1013,7 @@ ggplot(df_megasheet_all_observations_R6_only6, aes(x=Gene_Tx, y=Mean_total_tx_ea
   xlab("Ug RNA input (capture)")+
   theme(axis.text.x = element_text(angle=90, size=8, hjust = 1, vjust=0.5), axis.line.x = element_line(color="black"), axis.line.y = element_line(color="black"), panel.grid.major = element_line(size=0.5, linetype='solid', color="grey"),panel.grid.minor = element_line(size=0.25, linetype='solid', color="grey"),panel.spacing = unit(0, "lines"),panel.border = element_rect(color = "black", fill = NA, size = 1),strip.background = element_rect(color = "black", size = 1)) +
   
-geom_errorbar(aes(ymin=Mean_total_tx_each_replicate_per_ug-SE_total_tx_each_replicate_per_ug, ymax=Mean_total_tx_each_replicate_per_ug+SE_total_tx_each_replicate_per_ug), position=position_dodge2(preserve="single")) +
+  geom_errorbar(aes(ymin=Mean_total_tx_each_replicate_per_ug-SE_total_tx_each_replicate_per_ug, ymax=Mean_total_tx_each_replicate_per_ug+SE_total_tx_each_replicate_per_ug), position=position_dodge2(preserve="single")) +
   
   #geom_text(aes(label = Gene_Tx), vjust = 0.5, hjust = 4, angle = 90, position = position_dodge2(width =0.9, preserve = "single"), size = 2.5) +
   
